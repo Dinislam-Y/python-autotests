@@ -1,0 +1,11 @@
+services:
+  tests:
+    build: .
+    # allure-results пробрасываю на хост — чтобы открыть отчёт после прогона
+    volumes:
+      - ./allure-results:/app/allure-results
+    environment:
+      - HEADLESS=true
+    # .env с API-ключом тоже подтягиваем
+    env_file:
+      - .env

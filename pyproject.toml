@@ -1,0 +1,41 @@
+# конфиг проекта — автотесты для tochka-school и reqres.in
+[project]
+name = "python-autotests"
+version = "0.1.0"
+description = "UI + API автотесты для tochka-school.ru и reqres.in"
+requires-python = ">=3.9"
+
+# зависимости — всё что нужно для pytest + playwright + allure
+dependencies = [
+    "pytest>=8.0",
+    "playwright",
+    "pytest-playwright",
+    "requests",
+    "pydantic>=2.0",
+    "pydantic-settings",
+    "allure-pytest",
+    "faker",
+    "python-dotenv",
+]
+
+# ruff отдельно, в проде не нужен
+[project.optional-dependencies]
+dev = ["ruff"]
+
+# настройки pytest — маркеры, пути, формат вывода
+[tool.pytest.ini_options]
+markers = [
+    "api: API тесты reqres.in",
+    "ui: UI тесты tochka-school",
+    "smoke: дымовые тесты",
+]
+addopts = "-v --tb=short --alluredir=allure-results"
+testpaths = ["tests"]
+
+# ruff — линтер, держу строки до 120 символов
+[tool.ruff]
+line-length = 120
+
+# правила — базовый набор: ошибки, warnings, сортировка импортов
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]

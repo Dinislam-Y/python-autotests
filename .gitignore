@@ -1,0 +1,29 @@
+# виртуалка и кеш питона
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# секреты
+.env
+
+# allure — генерится при прогоне, не коммитим
+allure-results/
+allure-report/
+
+# результаты тестов
+test-results/
+
+# сборка
+*.egg-info/
+dist/
+build/
+
+# макось
+.DS_Store
+
+# локальные настройки
+.claude/
+.idea/
+CLAUDE.md
