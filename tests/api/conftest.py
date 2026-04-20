@@ -1,6 +1,7 @@
 import pytest
 
 from tests.api.checks.auth_checks import AuthChecks
+from tests.api.checks.resource_checks import ResourceChecks
 from tests.api.checks.user_checks import UserChecks
 from utils.api_client import ApiClient
 
@@ -19,3 +20,8 @@ def user_checks():
 @pytest.fixture
 def auth_checks():
     return AuthChecks()
+
+
+@pytest.fixture
+def resource_checks():
+    return ResourceChecks()

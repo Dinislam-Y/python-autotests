@@ -54,7 +54,7 @@ Instead of putting everything directly into test files, the project keeps reusab
 | Python version | `3.9+` |
 | Collected test cases | `60` |
 | UI style | Page Object + dedicated checks layer |
-| API style | Session-based client + response models |
+| API style | Session-based client + strict contract validation |
 | Reporting | Allure steps, attachments, screenshots on failure |
 | Environment | Local venv or Docker |
 
@@ -94,6 +94,21 @@ Instead of putting everything directly into test files, the project keeps reusab
 | Failures are hard to debug | The failing layer usually tells you where the issue is |
 | Shared setup gets copied between test files | Fixtures build reusable page/check objects |
 | API tests often stop at `status_code == 200` | `Pydantic` models validate response structure |
+
+### API contract validation
+
+The API layer validates more than business fields.
+
+| Contract check | What it protects |
+| --- | --- |
+| `status_code` validation | Detects wrong response status early |
+| JSON `Content-Type` validation | Catches format drift |
+| Pydantic schema validation | Verifies field names and types |
+| Empty `{}` validation for `404` | Verifies negative-case contract |
+| Empty body validation for `204` | Verifies delete contract |
+| `_meta` schema validation | Detects live `reqres.in` contract changes |
+
+This matters because `reqres.in` now includes a service `_meta` block in successful responses. The project validates that block explicitly instead of ignoring it.
 
 ### Example flow
 
@@ -274,6 +289,13 @@ allure serve allure-results
 | API attachments | `utils/api_client.py` stores response payloads |
 | UI screenshots on failure | `tests/ui/conftest.py` hook attaches screenshots |
 
+### API verification status
+
+The current API contract layer has been verified against the live `reqres.in` service:
+
+- `.venv/bin/pytest tests/api/ -q`
+- result: `17 passed`
+
 ## Design decisions
 
 ### Why `Pages` and `Checks` are separate
@@ -287,6 +309,8 @@ In many UI test projects, page objects gradually turn into a mix of actions and 
 ### Why the API layer uses models
 
 The API tests do not stop at checking status codes. They validate JSON structure through `Pydantic` models, which makes schema drift visible earlier.
+
+The contract layer also checks response shape details such as JSON `Content-Type`, empty-body behavior for `204`, and empty JSON behavior for `404`.
 
 ### Why there are no database checks
 
@@ -303,10 +327,10 @@ These are the most relevant next improvements for the current project:
 
 | Next step | Why it matters |
 | --- | --- |
-| Stronger API contract validation | Expand response coverage beyond the current models |
 | CI matrix | Run the suite across multiple Python versions |
 | Mocks and test doubles | Add isolated tests for reusable utilities such as `ApiClient` |
 | Architecture diagrams | Make framework decisions even easier to review visually |
+| Broader API endpoint coverage | Extend the same contract rules to more endpoints or a local demo API |
 
 ## Related notes
 

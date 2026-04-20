@@ -120,6 +120,35 @@ This helps in two ways:
 
 For example, if an endpoint suddenly changes field names or types, parsing fails and the test tells you that the contract changed.
 
+### Contract checks beyond schemas
+
+Schema models alone are not enough. I also wanted the framework to verify protocol-level expectations that are easy to miss in API projects.
+
+That is why I added a shared API checks layer for contract validation.
+
+It verifies:
+
+| Contract rule | Why it matters |
+| --- | --- |
+| Expected `status_code` | Basic response contract |
+| JSON `Content-Type` | Guards against format changes |
+| Empty `{}` for `404` | Verifies negative-case consistency |
+| Empty body for `204` | Verifies delete semantics |
+| Pydantic model parsing | Verifies field names, types, and structure |
+
+This layer lives separately from test files for the same reason as the UI design: I want reusable validation that does not turn tests into low-level assertion dumps.
+
+### A real example of schema drift
+
+While strengthening the contract validation, I found that `reqres.in` currently adds a `_meta` object to successful responses.
+
+That was useful for two reasons:
+
+- it proved that the contract checks were catching real API changes
+- it gave me a better example to show in the repository than a fake theoretical drift
+
+Instead of ignoring `_meta`, I modeled it explicitly and treated it as part of the current public contract of the service.
+
 ## Why fixtures matter here
 
 `pytest` fixtures are the assembly layer of the framework.
@@ -181,10 +210,10 @@ I prefer this trade-off profile for a framework project because maintainability 
 
 If I continue evolving this repository, these are the most logical next steps:
 
-1. Strengthen contract validation across more API responses.
-2. Add a CI matrix for multiple Python versions.
-3. Add mocks and test doubles for isolated utility tests.
-4. Expand architecture documentation with diagrams.
+1. Add a CI matrix for multiple Python versions.
+2. Add mocks and test doubles for isolated utility tests.
+3. Expand architecture documentation with diagrams.
+4. Apply the same contract style to a wider set of API targets.
 
 ## Final principle
 

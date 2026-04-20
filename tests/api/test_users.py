@@ -44,7 +44,10 @@ class TestUsers:
     @allure.story("Обновление пользователя")
     @allure.title("Обновить пользователя через PUT")
     def test_update_user_put(self, api_client, user_checks):
-        response = api_client.put(f"/api/users/{EXISTING_USER_ID}", json={"name": CREATE_USER_NAME, "job": UPDATE_USER_JOB})
+        response = api_client.put(
+            f"/api/users/{EXISTING_USER_ID}",
+            json={"name": CREATE_USER_NAME, "job": UPDATE_USER_JOB},
+        )
         user_checks.check_user_updated(response, UPDATE_USER_JOB)
 
     @allure.story("Обновление пользователя")
