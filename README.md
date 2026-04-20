@@ -1,91 +1,168 @@
 # Python QA Autotests
 
-[![CI](https://github.com/Dinislam-Y/python-autotests/actions/workflows/tests.yml/badge.svg)](https://github.com/Dinislam-Y/python-autotests/actions)
-![Python](https://img.shields.io/badge/python-3.9+-blue)
-![Tests](https://img.shields.io/badge/tests-44%20passed-brightgreen)
+![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+![Pytest](https://img.shields.io/badge/pytest-8.x-0A9EDC)
+![Playwright](https://img.shields.io/badge/playwright-ui%20tests-45BA4B)
+![Requests](https://img.shields.io/badge/requests-api%20tests-20232A)
+![Allure](https://img.shields.io/badge/allure-reporting-orange)
+![Docker](https://img.shields.io/badge/docker-ready-2496ED)
 
-Автотесты для лендинга **Точка Знаний** (UI) и **reqres.in** (API).
+UI and API test automation framework built with `pytest`, `Playwright`, `requests`, `Pydantic`, `Allure`, and `Docker`.
 
-Проект вырос из моего опыта в Flutter QA — я адаптировал архитектуру, которую обкатал на 4000+ тестах, под Python-стек. Здесь тот же принцип строгого разделения ответственности, только вместо Flutter-виджетов — Playwright и requests.
+This repository covers two public targets:
 
----
+| Area | Target | Purpose |
+| --- | --- | --- |
+| UI | `https://cms-dev.tochka-school.ru` | End-to-end checks for a real educational landing page |
+| API | `https://reqres.in` | API flows, negative cases, and response schema validation |
 
-## Стек
+The framework is based on a separation-of-concerns pattern I previously used in large Flutter QA projects and adapted for Python:
 
-| Категория | Инструмент | Зачем |
-|-----------|-----------|-------|
-| Фреймворк | pytest | Гибкие фикстуры, маркеры, параметризация |
-| UI | Playwright | Быстрый, стабильный, авто-ожидания |
-| API | requests + Pydantic | HTTP-запросы + валидация схемы ответов |
-| Отчёты | Allure | Steps, скриншоты при падении, история |
-| Линтер | ruff | Быстрый, заменяет flake8+isort+black |
-| CI/CD | GitHub Actions | Прогон на пуше, деплой Allure на Pages |
-| Контейнер | Docker | Воспроизводимый запуск одной командой |
+`Locators -> Pages -> Checks -> Tests`
 
-## Архитектура
+The goal is simple: keep tests readable, make failures easier to localize, and avoid mixing navigation, assertions, and selectors in the same place.
 
-Я перенёс из Flutter трёхслойный паттерн **Locators → Pages → Checks**. В моём опыте это единственная схема, которая нормально масштабируется и выдерживает мутационное тестирование:
+## Table of Contents
 
-```
-Locators   — только селекторы, никакой логики
-Pages      — только действия (click, fill, navigate), никаких assert
-Checks     — только проверки (assert), каждый метод — одно условие
-Tests      — только флоу: page.action() + check.verify(), без if/else
-```
+- [Why this project exists](#why-this-project-exists)
+- [What is inside](#what-is-inside)
+- [Architecture](#architecture)
+- [Project layout](#project-layout)
+- [Quick start](#quick-start)
+- [Configuration](#configuration)
+- [Run commands](#run-commands)
+- [Docker](#docker)
+- [Allure reporting](#allure-reporting)
+- [Design decisions](#design-decisions)
+- [Roadmap](#roadmap)
 
-Тест выглядит так:
+## Why this project exists
+
+This is a portfolio-grade automation project with two goals:
+
+1. Show a practical Python QA stack across UI and API testing.
+2. Demonstrate framework design, not just isolated test scripts.
+
+Instead of putting everything directly into test files, the project keeps reusable logic in dedicated layers and uses fixtures to compose scenarios cleanly.
+
+## What is inside
+
+### At a glance
+
+| Metric | Current state |
+| --- | --- |
+| Python version | `3.9+` |
+| Collected test cases | `60` |
+| UI style | Page Object + dedicated checks layer |
+| API style | Session-based client + response models |
+| Reporting | Allure steps, attachments, screenshots on failure |
+| Environment | Local venv or Docker |
+
+### Test suite breakdown
+
+| Suite | Scope | Collected cases |
+| --- | --- | ---: |
+| API: Users | CRUD user flows on `reqres.in` | 7 |
+| API: Auth | Registration and login, positive and negative | 4 |
+| API: Resources | Parameterized resource and pagination checks | 6 |
+| UI: Navigation | Section navigation, logo behavior, browser history | 14 |
+| UI: Main page | Hero, categories, directions, reviews, CTA blocks | 7 |
+| UI: Courses | Catalog page, titles, subject routes | 8 |
+| UI: Enrollment form | Modal visibility and input behavior | 5 |
+| UI: Footer | Social links, documents, footer visibility | 6 |
+| UI: User flows | Multi-step user journeys | 3 |
+| Total | API + UI | 60 |
+
+## Architecture
+
+### Layer responsibilities
+
+| Layer | Responsibility | What does not belong here |
+| --- | --- | --- |
+| `locators/` | Raw selectors and element addresses | Business logic, assertions |
+| `pages/` | Actions such as open, click, fill, navigate, scroll | Assertions about expected results |
+| `checks/` | Assertions and validation helpers | Direct navigation and UI actions |
+| `test_*.py` | Scenario flow orchestration | Selectors, heavy logic, duplicated asserts |
+| `conftest.py` | Fixture wiring and shared setup | Business-specific test logic |
+
+### Why this split works
+
+| Problem in test automation | How this project handles it |
+| --- | --- |
+| Tests become unreadable when selectors live everywhere | Selectors are isolated in `locators/` |
+| Assertions get mixed into action methods | Assertions live in `checks/` only |
+| Failures are hard to debug | The failing layer usually tells you where the issue is |
+| Shared setup gets copied between test files | Fixtures build reusable page/check objects |
+| API tests often stop at `status_code == 200` | `Pydantic` models validate response structure |
+
+### Example flow
 
 ```python
-def test_main_page_opens(main_page, main_page_checks):
+def test_main_page_opens(main_page, main_page_checks, header_page):
     main_page.open()
-    main_page_checks.check_title_contains("Точка")
+    main_page_checks.check_title_contains(MAIN_PAGE_TITLE_CONTAINS)
+
+    header_page.scroll_to_bottom()
+    header_page.scroll_to_top()
+
     main_page_checks.check_hero_banner_visible()
 ```
 
-Никаких селекторов в тестах, никаких ассертов в страницах. Если тест падает — сразу ясно, где проблема: в локаторе, в действии или в проверке.
+The test reads like a scenario:
 
-## Структура проекта
+- open the page
+- perform user actions
+- verify outcomes through dedicated checks
 
-```
+### Architecture note
+
+The full write-up is here:
+
+- [How I built the framework](docs/how-i-built-the-framework.md)
+
+## Project layout
+
+```text
 python-autotests/
-├── tests/
-│   ├── conftest.py                     # Общие фикстуры (settings)
-│   ├── api/
-│   │   ├── conftest.py                 # API-фикстуры (api_client)
-│   │   ├── test_data.py                # Константы — как Dependencies во Flutter
-│   │   ├── models.py                   # Pydantic-модели ответов
-│   │   ├── checks/                     # Ассерты: user_checks, auth_checks
-│   │   ├── test_users.py               # CRUD users (7 тестов)
-│   │   ├── test_register.py            # Регистрация/логин (4 теста)
-│   │   └── test_resources.py           # Ресурсы + параметризация (6 тестов)
-│   └── ui/
-│       ├── conftest.py                 # UI-фикстуры, скриншот при падении
-│       ├── test_data.py                # URL разделов, ожидаемые тексты
-│       ├── locators/                   # Селекторы: header, main, courses, form, footer
-│       ├── pages/                      # Page Objects (только действия)
-│       ├── checks/                     # Проверки (только assert)
-│       ├── test_navigation.py          # Навигация по разделам (12 тестов)
-│       ├── test_main_page.py           # Главная страница (4 теста)
-│       ├── test_courses.py             # Каталог курсов (5 тестов)
-│       ├── test_enrollment_form.py     # Форма записи (3 теста)
-│       └── test_footer.py             # Футер и ссылки (3 теста)
-├── utils/
-│   ├── api_client.py                   # HTTP-обёртка с Allure-вложениями
-│   └── helpers.py                      # Faker для тестовых данных
-├── config/
-│   ├── config.py                       # Pydantic Settings (.env)
-│   └── .env.example                    # Шаблон переменных окружения
-├── Dockerfile                          # Python + Playwright + браузеры
-├── docker-compose.yml                  # Запуск тестов одной командой
-├── .dockerignore
-└── pyproject.toml                      # Зависимости, pytest, ruff
+|-- config/
+|   |-- .env.example
+|   `-- config.py
+|-- docs/
+|   `-- how-i-built-the-framework.md
+|-- tests/
+|   |-- conftest.py
+|   |-- api/
+|   |   |-- checks/
+|   |   |-- conftest.py
+|   |   |-- models.py
+|   |   |-- test_data.py
+|   |   |-- test_register.py
+|   |   |-- test_resources.py
+|   |   `-- test_users.py
+|   `-- ui/
+|       |-- checks/
+|       |-- locators/
+|       |-- pages/
+|       |-- conftest.py
+|       |-- test_courses.py
+|       |-- test_data.py
+|       |-- test_enrollment_form.py
+|       |-- test_footer.py
+|       |-- test_main_page.py
+|       |-- test_navigation.py
+|       `-- test_user_flow.py
+|-- utils/
+|   |-- api_client.py
+|   `-- helpers.py
+|-- Dockerfile
+|-- docker-compose.yml
+|-- pyproject.toml
+`-- README.md
 ```
 
----
+## Quick start
 
-## Быстрый старт
-
-### 1. Клонирование и установка
+### 1. Clone and install
 
 ```bash
 git clone https://github.com/Dinislam-Y/python-autotests.git
@@ -98,120 +175,140 @@ pip install -e ".[dev]"
 playwright install chromium
 ```
 
-### 2. Настройка API-ключа
+### 2. Configure environment variables
 
-reqres.in требует бесплатный API-ключ ([получить тут](https://app.reqres.in/signup)):
+`reqres.in` requires a free API key.
 
 ```bash
 cp config/.env.example .env
-# открыть .env и вставить свой ключ в API_KEY=...
 ```
 
-### 3. Запуск тестов
+Then update `.env`:
 
-```bash
-# все тесты (API + UI)
-pytest
-
-# только API
-pytest -m api
-
-# только UI (headless — без браузера)
-pytest -m ui
-
-# UI с браузером — видно что происходит
-pytest -m ui --headed
-
-# UI замедленный — 1 сек между действиями, удобно смотреть
-pytest -m ui --headed --slowmo=1000
-
-# smoke-набор (самые важные)
-pytest -m smoke
-
-# конкретный файл
-pytest tests/ui/test_navigation.py -v --headed
-
-# конкретный тест
-pytest tests/ui/test_navigation.py::TestNavigation::test_main_page_opens -v --headed
+```env
+BASE_URL_UI=https://cms-dev.tochka-school.ru
+BASE_URL_API=https://reqres.in
+API_KEY=your-api-key-here
+BROWSER=chromium
+HEADLESS=true
+TIMEOUT=30000
 ```
 
----
+## Configuration
 
-## Запуск в Docker
+| Variable | Default | Description |
+| --- | --- | --- |
+| `BASE_URL_UI` | `https://cms-dev.tochka-school.ru` | Base URL for UI tests |
+| `BASE_URL_API` | `https://reqres.in` | Base URL for API tests |
+| `API_KEY` | empty | API key required by `reqres.in` |
+| `BROWSER` | `chromium` | Playwright browser selection |
+| `HEADLESS` | `true` | Run UI tests headless or headed |
+| `TIMEOUT` | `30000` | Default timeout in milliseconds |
 
-Docker позволяет запустить тесты без установки Python, Playwright и браузеров — всё внутри контейнера.
+## Run commands
 
-### Через docker compose (рекомендуется)
+### Local runs
+
+| Command | What it does |
+| --- | --- |
+| `.venv/bin/pytest` | Run the full suite |
+| `.venv/bin/pytest -m api` | Run API tests only |
+| `.venv/bin/pytest -m ui` | Run UI tests only |
+| `.venv/bin/pytest -m smoke` | Run smoke tests only |
+| `.venv/bin/pytest tests/ui/test_navigation.py -v --headed` | Run one UI module in headed mode |
+| `.venv/bin/pytest tests/api/test_users.py -v` | Run one API module |
+| `.venv/bin/pytest --collect-only -q` | Show collected tests without execution |
+
+### Pytest markers
+
+| Marker | Meaning |
+| --- | --- |
+| `api` | API tests against `reqres.in` |
+| `ui` | UI tests against the landing page |
+| `smoke` | Small high-value subset |
+
+## Docker
+
+The repository also runs inside a container based on the official Microsoft Playwright Python image.
+
+### Build and run
 
 ```bash
-# собрать образ и запустить тесты
 docker compose up --build
+```
 
-# результаты Allure появятся в ./allure-results/ на хосте
+### What Docker gives you
+
+| Benefit | Why it matters |
+| --- | --- |
+| Reproducible environment | Same Python, Playwright, and browser setup |
+| Faster onboarding | No need to install the full toolchain manually |
+| Shared execution model | Useful for demos and CI pipelines |
+
+### Notes
+
+- The container expects `.env` to exist.
+- `allure-results/` is mounted back to the host machine.
+- Headed UI mode is not the default Docker path; use headless execution there.
+
+## Allure reporting
+
+Allure output is enabled via `pyproject.toml`:
+
+```toml
+[tool.pytest.ini_options]
+addopts = "-v --tb=short --alluredir=allure-results"
+```
+
+### Generate a report locally
+
+```bash
 allure serve allure-results
 ```
 
-### Через docker напрямую
+### Reporting features used in this project
 
-```bash
-# собрать образ
-docker build -t python-autotests .
+| Feature | Where it is used |
+| --- | --- |
+| Test steps | Decorators on page and check methods |
+| API attachments | `utils/api_client.py` stores response payloads |
+| UI screenshots on failure | `tests/ui/conftest.py` hook attaches screenshots |
 
-# запустить тесты
-docker run --env-file .env -v ./allure-results:/app/allure-results python-autotests
+## Design decisions
 
-# запустить только API тесты
-docker run --env-file .env python-autotests pytest tests/api/ -v
+### Why `Pages` and `Checks` are separate
 
-# запустить только UI
-docker run --env-file .env -v ./allure-results:/app/allure-results python-autotests pytest tests/ui/ -v
-```
+In many UI test projects, page objects gradually turn into a mix of actions and assertions. That makes them convenient at first and painful later. This repository keeps them separate on purpose:
 
-### Важно
+- a page object performs actions
+- a check object validates outcomes
+- a test composes both into a scenario
 
-- Docker Desktop должен быть запущен
-- `.env` файл с `API_KEY` нужен для API тестов
-- `--headed` в Docker не работает (нет монитора), только headless
-- Allure-результаты пробрасываются через volume на хост
+### Why the API layer uses models
 
----
+The API tests do not stop at checking status codes. They validate JSON structure through `Pydantic` models, which makes schema drift visible earlier.
 
-## Allure-отчёт
+### Why there are no database checks
 
-Отчёт генерируется автоматически при каждом прогоне (`--alluredir=allure-results` в pyproject.toml).
+This project tests public external systems. There is no access to their internal databases, so database assertions would be artificial here. The current framework focuses on what can be verified honestly from the outside:
 
-```bash
-# установка allure CLI (один раз)
-brew install allure
+- UI behavior
+- API responses
+- response contracts
+- navigation and user flows
 
-# открыть отчёт в браузере (запускает локальный сервер)
-allure serve allure-results
+## Roadmap
 
-# сгенерировать статический HTML-отчёт
-allure generate allure-results -o allure-report --clean
-open allure-report/index.html
-```
+These are the most relevant next improvements for the current project:
 
-Что увидишь в отчёте:
-- **Features** — группировка по модулям (Users API, Навигация, Каталог курсов...)
-- **Stories** — сценарии внутри модулей
-- **Steps** — каждый шаг теста (открытие страницы, клик, проверка)
-- **Attachments** — JSON-ответы API, скриншоты при падении UI тестов
+| Next step | Why it matters |
+| --- | --- |
+| Stronger API contract validation | Expand response coverage beyond the current models |
+| CI matrix | Run the suite across multiple Python versions |
+| Mocks and test doubles | Add isolated tests for reusable utilities such as `ApiClient` |
+| Architecture diagrams | Make framework decisions even easier to review visually |
 
-На CI отчёт автоматически публикуется на **GitHub Pages** после каждого прогона.
+## Related notes
 
----
-
-## Покрытие тестами
-
-| Сьют | Тестов | Что проверяем |
-|------|--------|---------------|
-| API: Users | 7 | GET/POST/PUT/PATCH/DELETE /api/users |
-| API: Auth | 4 | Регистрация и логин (позитив + негатив) |
-| API: Resources | 6 | Параметризация по id и пагинации |
-| UI: Навигация | 12 | Все разделы, возрастные категории, логотип |
-| UI: Главная | 4 | Баннер, категории, направления, отзывы |
-| UI: Курсы | 5 | Каталог, карточки, страницы предметов |
-| UI: Форма | 3 | Модалка, поле телефона, кнопка записи |
-| UI: Футер | 3 | Соцсети, документы, лицензия |
-| **Итого** | **44** | |
+- [Architecture note: How I built the framework](docs/how-i-built-the-framework.md)
+- [Learning notes](learning/)
